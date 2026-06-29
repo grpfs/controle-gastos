@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
   :root{
@@ -126,85 +127,142 @@
 
   footer.site{margin-top:30px;padding:20px 0 40px;color:var(--muted);font-size:12px;text-align:center;}
 
-  /* ---------- ÁREA DE IMPRESSÃO ---------- */
-  #area-impressao{display:none;}
+  /* ---------- MODAL DE PRÉ-VISUALIZAÇÃO DO RELATÓRIO ---------- */
+  .modal-overlay{
+    display:none;position:fixed;inset:0;background:rgba(15,20,25,0.65);z-index:1000;
+    align-items:center;justify-content:center;padding:20px;
+  }
+  .modal-overlay.visivel{display:flex;}
+  .modal-pdf-caixa{
+    background:#fff;border-radius:10px;width:100%;max-width:880px;max-height:92vh;
+    display:flex;flex-direction:column;overflow:hidden;box-shadow:0 20px 60px rgba(0,0,0,0.3);
+  }
+  .modal-pdf-cabecalho{
+    display:flex;align-items:center;justify-content:space-between;gap:12px;flex-wrap:wrap;
+    padding:14px 20px;border-bottom:1px solid var(--line);background:#FAFBFC;
+  }
+  .modal-pdf-cabecalho h3{font-family:var(--font-display);font-size:16px;margin:0;}
+  .modal-pdf-acoes{display:flex;gap:8px;flex-wrap:wrap;}
+  .modal-pdf-acoes button{
+    font-family:var(--font-body);font-weight:600;font-size:13px;border-radius:7px;padding:9px 14px;
+    cursor:pointer;border:1px solid transparent;
+  }
+  #btn-baixar-pdf{background:var(--teal);color:#fff;}
+  #btn-baixar-pdf:hover{background:var(--teal-deep);}
+  #btn-imprimir-relatorio{background:#fff;color:var(--ink);border-color:var(--line);}
+  #btn-imprimir-relatorio:hover{background:#F2F4F6;}
+  #btn-fechar-preview{background:#fff;color:var(--muted);border-color:var(--line);}
+  #btn-fechar-preview:hover{background:#F2F4F6;}
+  #pdf-status-msg{font-size:12.5px;font-weight:600;padding:0 20px;display:none;}
+  .modal-pdf-corpo{overflow:auto;padding:26px;background:#E9EBEE;flex:1;}
+
+  /* ---------- CONTEÚDO DO RELATÓRIO (usado na pré-visualização E na impressão) ---------- */
+  .relatorio-render{
+    font-family:'Inter', Arial, sans-serif;color:#15181F;font-size:13px;
+    background:#fff;max-width:760px;margin:0 auto;padding:32px 36px;border-radius:6px;
+    box-shadow:0 1px 4px rgba(0,0,0,0.08);
+  }
+  .relatorio-render .rel-cabecalho{
+    display:flex;justify-content:space-between;align-items:flex-end;
+    border-bottom:3px solid #0F6E66;padding-bottom:12px;margin-bottom:18px;
+  }
+  .relatorio-render .rel-marca{font-family:'Space Grotesk', Arial, sans-serif;font-weight:700;font-size:14px;color:#0F6E66;letter-spacing:0.3px;}
+  .relatorio-render .rel-marca small{display:block;font-weight:400;color:#777;font-size:10.5px;}
+  .relatorio-render .rel-meta{text-align:right;font-size:10.5px;color:#777;}
+  .relatorio-render h1{font-family:'Space Grotesk', Arial, sans-serif;font-size:24px;margin:0 0 3px;color:#0B4F49;}
+
+  .relatorio-render .rel-situacao{
+    display:flex;align-items:center;gap:10px;border-radius:6px;padding:10px 14px;margin-bottom:18px;font-size:13px;font-weight:600;
+  }
+  .relatorio-render .rel-situacao.ok{background:#EAF6F1;color:#0B4F49;border:1px solid #BFE0D8;}
+  .relatorio-render .rel-situacao.alerta{background:#FDEEEC;color:#8A271F;border:1px solid #F3C8C3;}
+
+  .relatorio-render .rel-visao-geral{
+    background:#F2F7F6;border:1px solid #BFE0D8;border-radius:8px;padding:16px 18px;margin-bottom:24px;page-break-inside:avoid;
+  }
+  .relatorio-render .rel-visao-geral h1{font-size:18px;}
+  .relatorio-render .rel-evolucao{width:100%;border-collapse:collapse;margin-top:10px;font-size:11.5px;}
+  .relatorio-render .rel-evolucao th, .relatorio-render .rel-evolucao td{padding:6px 7px;border-bottom:1px solid #D4E3DF;text-align:right;}
+  .relatorio-render .rel-evolucao th:first-child, .relatorio-render .rel-evolucao td:first-child{text-align:left;}
+
+  .relatorio-render h2{
+    font-family:'Space Grotesk', Arial, sans-serif;font-size:14.5px;margin:24px 0 12px;
+    color:#0B4F49;border-bottom:1.5px solid #0F6E66;padding-bottom:6px;
+    display:flex;align-items:center;gap:6px;
+  }
+
+  .relatorio-render .resumo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:4px;}
+  .relatorio-render .resumo-card{border:1px solid #D8DDE3;border-radius:6px;padding:10px 11px;background:#FAFBFC;}
+  .relatorio-render .resumo-card .icone-card{font-size:14px;}
+  .relatorio-render .resumo-card .rotulo{font-size:9.5px;text-transform:uppercase;letter-spacing:0.3px;color:#777;margin-top:3px;}
+  .relatorio-render .resumo-card .valor{font-family:'IBM Plex Mono', monospace;font-weight:700;font-size:15px;margin-top:2px;}
+  .relatorio-render .resumo-card.negativo .valor{color:#A6332B;}
+  .relatorio-render .resumo-card.positivo .valor{color:#0F6E66;}
+
+  .relatorio-render .barra-essencial{display:flex;height:20px;border-radius:5px;overflow:hidden;margin:10px 0 6px;}
+  .relatorio-render .barra-essencial .seg-essencial{background:#0F6E66;}
+  .relatorio-render .barra-essencial .seg-nao-essencial{background:#B9791E;}
+  .relatorio-render .legenda-essencial{display:flex;gap:16px;font-size:10.5px;color:#666;margin-bottom:20px;}
+  .relatorio-render .legenda-essencial span{display:inline-flex;align-items:center;gap:5px;}
+  .relatorio-render .legenda-essencial i{width:9px;height:9px;border-radius:2px;display:inline-block;}
+
+  .relatorio-render .grupo-prioridade{margin-bottom:14px;}
+  .relatorio-render .grupo-prioridade h3{
+    font-family:'Inter', Arial, sans-serif;font-size:11.5px;text-transform:uppercase;letter-spacing:0.4px;
+    margin:0 0 8px;display:flex;align-items:center;gap:6px;font-weight:700;
+  }
+  .relatorio-render .grupo-prioridade.alta h3{color:#A6332B;}
+  .relatorio-render .grupo-prioridade.media h3{color:#B9791E;}
+  .relatorio-render .grupo-prioridade.baixa h3{color:#2D6A4F;}
+  .relatorio-render .item-prioridade{
+    display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #E0E4E9;border-left:4px solid #999;
+    border-radius:5px;margin-bottom:6px;page-break-inside:avoid;
+  }
+  .relatorio-render .grupo-prioridade.alta .item-prioridade{border-left-color:#A6332B;background:#FCF2F1;}
+  .relatorio-render .grupo-prioridade.media .item-prioridade{border-left-color:#B9791E;background:#FDF8EF;}
+  .relatorio-render .grupo-prioridade.baixa .item-prioridade{border-left-color:#2D6A4F;background:#F2F8F5;}
+  .relatorio-render .item-prioridade .check{font-size:14px;color:#999;flex-shrink:0;}
+  .relatorio-render .item-prioridade .info{flex:1;}
+  .relatorio-render .item-prioridade .info strong{font-size:12.5px;}
+  .relatorio-render .item-prioridade .info small{display:block;color:#666;font-size:10.5px;margin-top:1px;}
+  .relatorio-render .item-prioridade .valor-item{font-family:'IBM Plex Mono', monospace;font-weight:700;font-size:13px;flex-shrink:0;width:90px;text-align:right;}
+  .relatorio-render .tag-atrasado{display:inline-block;background:#A6332B;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;}
+  .relatorio-render .sem-pendencias{color:#0F6E66;font-size:12.5px;font-weight:600;background:#EAF6F1;border-radius:6px;padding:10px 12px;}
+
+  .relatorio-render table.rel-tabela{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:6px;}
+  .relatorio-render table.rel-tabela th{
+    background:#0F6E66;color:#fff;font-size:9.5px;text-transform:uppercase;letter-spacing:0.3px;
+    padding:7px 8px;text-align:left;
+  }
+  .relatorio-render table.rel-tabela th.num, .relatorio-render table.rel-tabela td.num{text-align:right;font-family:'IBM Plex Mono', monospace;}
+  .relatorio-render table.rel-tabela td{padding:6px 8px;border-bottom:1px solid #E5E8EC;}
+  .relatorio-render table.rel-tabela tr:nth-child(even) td{background:#F7F9FA;}
+  .relatorio-render table.rel-tabela tr.linha-negativa td{background:#FBEAE8 !important;color:#A6332B;font-weight:700;}
+  .relatorio-render table.rel-tabela tr.linha-paga-rel td{color:#999;text-decoration:line-through;}
+
+  .relatorio-render .barra-cat-rel{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11.5px;}
+  .relatorio-render .barra-cat-rel .nome{width:130px;flex-shrink:0;}
+  .relatorio-render .barra-cat-rel .trilho{flex:1;background:#EEF1F5;border-radius:4px;height:11px;overflow:hidden;}
+  .relatorio-render .barra-cat-rel .preenchido{background:#0F6E66;height:100%;}
+  .relatorio-render .barra-cat-rel .valor{font-family:'IBM Plex Mono', monospace;width:80px;text-align:right;flex-shrink:0;}
+  .relatorio-render .barra-cat-rel .pct{font-family:'IBM Plex Mono', monospace;width:40px;text-align:right;flex-shrink:0;color:#777;font-size:10.5px;}
+
+  .relatorio-render .rel-rodape{margin-top:20px;padding-top:10px;border-top:1px solid #D8DDE3;font-size:9.5px;color:#999;}
+  .relatorio-render .secao-mes{margin-bottom:10px;}
+  .relatorio-render .secao-mes + .secao-mes{margin-top:34px;border-top:2px dashed #D8DDE3;padding-top:28px;}
+
+  /* ---------- IMPRESSÃO ---------- */
   @media print{
     @page{ margin: 14mm 12mm; }
     body.imprimindo > *{display:none !important;}
-    body.imprimindo #area-impressao{display:block !important;}
-
-    #area-impressao{font-family:'Inter', Arial, sans-serif;color:#15181F;padding:0;font-size:12px;}
-
-    #area-impressao .rel-cabecalho{
-      display:flex;justify-content:space-between;align-items:flex-end;
-      border-bottom:3px solid #0F6E66;padding-bottom:10px;margin-bottom:16px;
-    }
-    #area-impressao .rel-marca{font-family:'Space Grotesk', Arial, sans-serif;font-weight:700;font-size:13px;color:#0F6E66;letter-spacing:0.3px;}
-    #area-impressao .rel-marca small{display:block;font-weight:400;color:#777;font-size:10px;}
-    #area-impressao .rel-meta{text-align:right;font-size:10px;color:#777;}
-    #area-impressao h1{font-family:'Space Grotesk', Arial, sans-serif;font-size:22px;margin:0 0 2px;color:#0B4F49;}
-
-    #area-impressao .rel-visao-geral{
-      background:#F2F7F6;border:1px solid #BFE0D8;border-radius:6px;padding:14px 16px;margin-bottom:22px;page-break-inside:avoid;
-    }
-    #area-impressao .rel-visao-geral h1{font-size:16px;}
-    #area-impressao .rel-evolucao{width:100%;border-collapse:collapse;margin-top:8px;font-size:11px;}
-    #area-impressao .rel-evolucao th, #area-impressao .rel-evolucao td{padding:5px 6px;border-bottom:1px solid #D4E3DF;text-align:right;}
-    #area-impressao .rel-evolucao th:first-child, #area-impressao .rel-evolucao td:first-child{text-align:left;}
-
-    #area-impressao h2{
-      font-family:'Space Grotesk', Arial, sans-serif;font-size:13.5px;margin:20px 0 10px;
-      color:#0B4F49;border-bottom:1.5px solid #0F6E66;padding-bottom:5px;
-      display:flex;align-items:center;gap:6px;
-    }
-
-    #area-impressao .resumo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:8px;margin-bottom:6px;}
-    #area-impressao .resumo-card{border:1px solid #D8DDE3;border-radius:5px;padding:8px 10px;background:#FAFBFC;}
-    #area-impressao .resumo-card .rotulo{font-size:9px;text-transform:uppercase;letter-spacing:0.3px;color:#777;}
-    #area-impressao .resumo-card .valor{font-family:'IBM Plex Mono', monospace;font-weight:700;font-size:14px;margin-top:2px;}
-    #area-impressao .resumo-card.negativo .valor{color:#A6332B;}
-    #area-impressao .resumo-card.positivo .valor{color:#0F6E66;}
-
-    #area-impressao .lista-prioridade{margin-bottom:4px;}
-    #area-impressao .item-prioridade{
-      display:flex;align-items:center;gap:10px;padding:7px 9px;border:1px solid #E0E4E9;border-left:4px solid #999;
-      border-radius:4px;margin-bottom:6px;page-break-inside:avoid;
-    }
-    #area-impressao .item-prioridade.alta{border-left-color:#A6332B;background:#FCF2F1;}
-    #area-impressao .item-prioridade.media{border-left-color:#B9791E;background:#FDF8EF;}
-    #area-impressao .item-prioridade.baixa{border-left-color:#2D6A4F;background:#F2F8F5;}
-    #area-impressao .item-prioridade .check{font-size:14px;color:#999;flex-shrink:0;}
-    #area-impressao .item-prioridade .info{flex:1;}
-    #area-impressao .item-prioridade .info strong{font-size:12px;}
-    #area-impressao .item-prioridade .info small{display:block;color:#666;font-size:10px;margin-top:1px;}
-    #area-impressao .item-prioridade .tag-prio{font-size:9px;font-weight:700;text-transform:uppercase;padding:2px 7px;border-radius:10px;flex-shrink:0;}
-    #area-impressao .item-prioridade.alta .tag-prio{background:#A6332B;color:#fff;}
-    #area-impressao .item-prioridade.media .tag-prio{background:#B9791E;color:#fff;}
-    #area-impressao .item-prioridade.baixa .tag-prio{background:#2D6A4F;color:#fff;}
-    #area-impressao .item-prioridade .valor-item{font-family:'IBM Plex Mono', monospace;font-weight:700;font-size:12.5px;flex-shrink:0;width:90px;text-align:right;}
-    #area-impressao .tag-atrasado{display:inline-block;background:#A6332B;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;}
-
-    #area-impressao table.rel-tabela{width:100%;border-collapse:collapse;font-size:11px;margin-bottom:4px;}
-    #area-impressao table.rel-tabela th{
-      background:#0F6E66;color:#fff;font-size:9.5px;text-transform:uppercase;letter-spacing:0.3px;
-      padding:6px 7px;text-align:left;
-    }
-    #area-impressao table.rel-tabela th.num, #area-impressao table.rel-tabela td.num{text-align:right;font-family:'IBM Plex Mono', monospace;}
-    #area-impressao table.rel-tabela td{padding:5.5px 7px;border-bottom:1px solid #E5E8EC;}
-    #area-impressao table.rel-tabela tr:nth-child(even) td{background:#F7F9FA;}
-    #area-impressao table.rel-tabela tr.linha-negativa td{background:#FBEAE8 !important;color:#A6332B;font-weight:700;}
-    #area-impressao table.rel-tabela tr.linha-paga-rel td{color:#999;text-decoration:line-through;}
-
-    #area-impressao .barra-cat-rel{display:flex;align-items:center;gap:8px;margin-bottom:5px;font-size:11px;}
-    #area-impressao .barra-cat-rel .nome{width:130px;flex-shrink:0;}
-    #area-impressao .barra-cat-rel .trilho{flex:1;background:#EEF1F5;border-radius:4px;height:10px;overflow:hidden;}
-    #area-impressao .barra-cat-rel .preenchido{background:#0F6E66;height:100%;}
-    #area-impressao .barra-cat-rel .valor{font-family:'IBM Plex Mono', monospace;width:80px;text-align:right;flex-shrink:0;}
-    #area-impressao .barra-cat-rel .pct{font-family:'IBM Plex Mono', monospace;width:40px;text-align:right;flex-shrink:0;color:#777;font-size:10px;}
-
-    #area-impressao .rel-rodape{margin-top:18px;padding-top:8px;border-top:1px solid #D8DDE3;font-size:9px;color:#999;}
-    #area-impressao .secao-mes{margin-bottom:30px;page-break-before:always;}
-    #area-impressao .secao-mes:first-of-type{page-break-before:auto;}
+    body.imprimindo .modal-overlay{display:block !important;position:static !important;background:none !important;padding:0 !important;}
+    body.imprimindo .modal-pdf-cabecalho{display:none !important;}
+    body.imprimindo .modal-pdf-caixa{max-height:none !important;box-shadow:none !important;border-radius:0 !important;width:100% !important;max-width:100% !important;}
+    body.imprimindo .modal-pdf-corpo{overflow:visible !important;background:none !important;padding:0 !important;}
+    body.imprimindo .relatorio-render{box-shadow:none !important;max-width:100% !important;}
+    .relatorio-render .secao-mes{page-break-before:always;}
+    .relatorio-render .secao-mes:first-of-type{page-break-before:auto;}
+    .relatorio-render .secao-mes + .secao-mes{border-top:none;padding-top:0;}
   }
 </style>
 </head>
@@ -213,6 +271,7 @@
 <header class="site">
   <div class="wrap">
     <div class="brand">CalculaBR<small>controle de gastos do casal</small></div>
+
     <div class="mes-control">
       <label for="mes-atual">Mês ativo</label>
       <input type="month" id="mes-atual">
@@ -343,7 +402,20 @@
 
 <footer class="site">Ferramenta de uso pessoal — os dados não são enviados a nenhum servidor.</footer>
 
-<div id="area-impressao"></div>
+<div class="modal-overlay" id="modal-overlay">
+  <div class="modal-pdf-caixa">
+    <div class="modal-pdf-cabecalho">
+      <h3>Pré-visualização do relatório</h3>
+      <div class="modal-pdf-acoes">
+        <button id="btn-baixar-pdf" type="button">⬇ Baixar PDF</button>
+        <button id="btn-imprimir-relatorio" type="button">Imprimir</button>
+        <button id="btn-fechar-preview" type="button">Fechar</button>
+      </div>
+    </div>
+    <p id="pdf-status-msg" role="status"></p>
+    <div class="modal-pdf-corpo" id="modal-pdf-corpo"></div>
+  </div>
+</div>
 
 <script>
 (function(){
@@ -920,6 +992,29 @@
       '</div>';
   }
 
+  function construirSituacaoMes(eventos){
+    var primeiraNegativa = eventos.find(function(e){ return e.saldoAcumulado < 0; });
+    if (primeiraNegativa){
+      return '<div class="rel-situacao alerta">⚠️ <span>Atenção: o saldo previsto fica negativo a partir de ' + C.formatarDataBR(primeiraNegativa.data) + '. Vale revisar a ordem de pagamento abaixo.</span></div>';
+    }
+    return '<div class="rel-situacao ok">✅ <span>O saldo previsto permanece positivo durante todo o mês.</span></div>';
+  }
+
+  function construirBarraEssencial(essencial, naoEssencial){
+    var total = essencial + naoEssencial;
+    if (total <= 0) return '';
+    var pctEss = (essencial / total) * 100;
+    var pctNao = 100 - pctEss;
+    return '<div class="barra-essencial">' +
+        '<div class="seg-essencial" style="width:' + pctEss + '%"></div>' +
+        '<div class="seg-nao-essencial" style="width:' + pctNao + '%"></div>' +
+      '</div>' +
+      '<div class="legenda-essencial">' +
+        '<span><i style="background:#0F6E66"></i>Essenciais (' + pctEss.toFixed(0) + '%)</span>' +
+        '<span><i style="background:#B9791E"></i>Não essenciais (' + pctNao.toFixed(0) + '%)</span>' +
+      '</div>';
+  }
+
   function construirVisaoGeral(meses){
     var totalRenda = 0, totalDespesa = 0;
     var linhasEvolucao = '';
@@ -935,9 +1030,9 @@
     var html = '<div class="rel-visao-geral">';
     html += '<h1>Visão geral — ' + meses.length + ' mês(es)</h1>';
     html += '<div class="resumo-grid">' +
-      '<div class="resumo-card"><div class="rotulo">Renda total do período</div><div class="valor">' + C.formatarBRL(totalRenda) + '</div></div>' +
-      '<div class="resumo-card"><div class="rotulo">Despesa total do período</div><div class="valor">' + C.formatarBRL(totalDespesa) + '</div></div>' +
-      '<div class="resumo-card ' + (saldoTotal < 0 ? 'negativo' : 'positivo') + '"><div class="rotulo">Saldo do período</div><div class="valor">' + C.formatarBRL(saldoTotal) + '</div></div>' +
+      '<div class="resumo-card"><div class="icone-card">💵</div><div class="rotulo">Renda total do período</div><div class="valor">' + C.formatarBRL(totalRenda) + '</div></div>' +
+      '<div class="resumo-card"><div class="icone-card">🧾</div><div class="rotulo">Despesa total do período</div><div class="valor">' + C.formatarBRL(totalDespesa) + '</div></div>' +
+      '<div class="resumo-card ' + (saldoTotal < 0 ? 'negativo' : 'positivo') + '"><div class="icone-card">' + (saldoTotal < 0 ? '📉' : '📈') + '</div><div class="rotulo">Saldo do período</div><div class="valor">' + C.formatarBRL(saldoTotal) + '</div></div>' +
       '</div>';
     html += '<table class="rel-evolucao"><thead><tr><th>Mês</th><th>Renda</th><th>Despesas</th><th>Saldo</th></tr></thead><tbody>' + linhasEvolucao + '</tbody></table>';
     html += '</div>';
@@ -954,36 +1049,48 @@
     var eventos = R.construirFluxo(dados);
     var hoje = C.hojeISO();
 
-    var pendentesOrdenadas = dados.despesas.filter(function(d){ return !d.pago; }).slice().sort(function(a,b){
-      var ra = C.RANK_PRIORIDADE[a.prioridade], rb = C.RANK_PRIORIDADE[b.prioridade];
-      if (ra !== rb) return ra - rb;
-      return a.dataVenc.localeCompare(b.dataVenc);
+    var pendentes = dados.despesas.filter(function(d){ return !d.pago; });
+    var grupos = [
+      { chave: 'alta', titulo: '🔴 Alta prioridade', itens: [] },
+      { chave: 'media', titulo: '🟡 Média prioridade', itens: [] },
+      { chave: 'baixa', titulo: '🟢 Baixa prioridade', itens: [] }
+    ];
+    pendentes.forEach(function(d){
+      var grupo = grupos.find(function(g){ return g.chave === d.prioridade; });
+      if (grupo) grupo.itens.push(d);
     });
+    grupos.forEach(function(g){ g.itens.sort(function(a,b){ return a.dataVenc.localeCompare(b.dataVenc); }); });
 
     var html = '<div class="secao-mes">';
     html += construirCabecalhoRelatorio('Referente a ' + C.nomeMesExtenso(mes));
     html += '<h1>' + C.nomeMesExtenso(mes) + '</h1>';
+    html += construirSituacaoMes(eventos);
 
     html += '<div class="resumo-grid">' +
-      '<div class="resumo-card"><div class="rotulo">Renda</div><div class="valor">' + C.formatarBRL(renda) + '</div></div>' +
-      '<div class="resumo-card"><div class="rotulo">Despesas essenciais</div><div class="valor">' + C.formatarBRL(essencial) + '</div></div>' +
-      '<div class="resumo-card"><div class="rotulo">Não essenciais</div><div class="valor">' + C.formatarBRL(naoEssencial) + '</div></div>' +
-      '<div class="resumo-card ' + (saldo < 0 ? 'negativo' : 'positivo') + '"><div class="rotulo">Saldo previsto</div><div class="valor">' + C.formatarBRL(saldo) + '</div></div>' +
+      '<div class="resumo-card"><div class="icone-card">💵</div><div class="rotulo">Renda</div><div class="valor">' + C.formatarBRL(renda) + '</div></div>' +
+      '<div class="resumo-card"><div class="icone-card">🏠</div><div class="rotulo">Despesas essenciais</div><div class="valor">' + C.formatarBRL(essencial) + '</div></div>' +
+      '<div class="resumo-card"><div class="icone-card">🎈</div><div class="rotulo">Não essenciais</div><div class="valor">' + C.formatarBRL(naoEssencial) + '</div></div>' +
+      '<div class="resumo-card ' + (saldo < 0 ? 'negativo' : 'positivo') + '"><div class="icone-card">' + (saldo < 0 ? '📉' : '📈') + '</div><div class="rotulo">Saldo previsto</div><div class="valor">' + C.formatarBRL(saldo) + '</div></div>' +
       '</div>';
+    html += construirBarraEssencial(essencial, naoEssencial);
 
-    html += '<h2>📌 Ordem de prioridade para pagar</h2><div class="lista-prioridade">';
-    pendentesOrdenadas.forEach(function(d){
-      var atrasado = d.dataVenc < hoje;
-      html += '<div class="item-prioridade ' + d.prioridade + '">' +
-        '<span class="check">☐</span>' +
-        '<div class="info"><strong>' + R.escapeHtml(d.descricao) + '</strong>' +
-        '<small>' + R.escapeHtml(d.categoria) + ' · Vence em ' + C.formatarDataBR(d.dataVenc) + (atrasado ? '<span class="tag-atrasado">ATRASADO</span>' : '') + '</small></div>' +
-        '<span class="tag-prio">' + C.LABEL_PRIORIDADE[d.prioridade] + '</span>' +
-        '<span class="valor-item">' + C.formatarBRL(d.valor) + '</span>' +
-        '</div>';
+    html += '<h2>📌 Ordem de prioridade para pagar</h2>';
+    var existePendente = pendentes.length > 0;
+    grupos.forEach(function(g){
+      if (g.itens.length === 0) return;
+      html += '<div class="grupo-prioridade ' + g.chave + '"><h3>' + g.titulo + ' (' + g.itens.length + ')</h3>';
+      g.itens.forEach(function(d){
+        var atrasado = d.dataVenc < hoje;
+        html += '<div class="item-prioridade">' +
+          '<span class="check">☐</span>' +
+          '<div class="info"><strong>' + R.escapeHtml(d.descricao) + '</strong>' +
+          '<small>' + R.escapeHtml(d.categoria) + ' · Vence em ' + C.formatarDataBR(d.dataVenc) + (atrasado ? '<span class="tag-atrasado">ATRASADO</span>' : '') + '</small></div>' +
+          '<span class="valor-item">' + C.formatarBRL(d.valor) + '</span>' +
+          '</div>';
+      });
+      html += '</div>';
     });
-    if (pendentesOrdenadas.length === 0) html += '<p style="color:#0F6E66;font-size:12px;">✓ Tudo pago neste mês.</p>';
-    html += '</div>';
+    if (!existePendente) html += '<p class="sem-pendencias">✓ Tudo pago neste mês.</p>';
 
     html += '<h2>💰 Fluxo de caixa por data</h2><table class="rel-tabela"><thead><tr><th>Data</th><th>Descrição</th><th>Tipo</th><th class="num">Valor</th><th class="num">Saldo acumulado</th></tr></thead><tbody>';
     eventos.forEach(function(e){
@@ -1021,25 +1128,68 @@
     return html;
   }
 
-  document.getElementById('btn-gerar-pdf').addEventListener('click', function(){
-    var escopo = document.getElementById('escopo-relatorio').value;
-    var area = document.getElementById('area-impressao');
-
+  function construirHtmlRelatorio(escopo){
     if (escopo === 'todos'){
       var meses = Object.keys(C.mesesData).sort();
       if (meses.length === 0) meses = [C.mesAtual];
       var capa = construirCabecalhoRelatorio(meses.length + ' mês(es) incluídos') + construirVisaoGeral(meses);
-      area.innerHTML = capa + meses.map(function(m){ return construirRelatorioMes(m); }).join('');
-    } else {
-      area.innerHTML = construirRelatorioMes(C.mesAtual);
+      return capa + meses.map(function(m){ return construirRelatorioMes(m); }).join('');
     }
+    return construirRelatorioMes(C.mesAtual);
+  }
 
+  // ---------- MODAL DE PRÉ-VISUALIZAÇÃO ----------
+  var modalOverlay = document.getElementById('modal-overlay');
+  var modalCorpo = document.getElementById('modal-pdf-corpo');
+  var pdfStatusMsg = document.getElementById('pdf-status-msg');
+
+  function mostrarStatusPdf(texto, cor){
+    pdfStatusMsg.textContent = texto;
+    pdfStatusMsg.style.color = cor || 'var(--muted)';
+    pdfStatusMsg.style.display = texto ? 'block' : 'none';
+  }
+
+  document.getElementById('btn-gerar-pdf').addEventListener('click', function(){
+    var escopo = document.getElementById('escopo-relatorio').value;
+    mostrarStatusPdf('');
+    modalCorpo.innerHTML = '<div class="relatorio-render">' + construirHtmlRelatorio(escopo) + '</div>';
+    modalOverlay.classList.add('visivel');
+  });
+
+  document.getElementById('btn-fechar-preview').addEventListener('click', function(){
+    modalOverlay.classList.remove('visivel');
+  });
+
+  document.getElementById('btn-imprimir-relatorio').addEventListener('click', function(){
     document.body.classList.add('imprimindo');
     window.print();
   });
 
   window.addEventListener('afterprint', function(){
     document.body.classList.remove('imprimindo');
+  });
+
+  document.getElementById('btn-baixar-pdf').addEventListener('click', function(){
+    if (typeof html2pdf === 'undefined'){
+      mostrarStatusPdf('Não foi possível carregar o gerador de PDF (verifique sua conexão com a internet). Use o botão "Imprimir" e escolha "Salvar como PDF" como alternativa.', 'var(--red)');
+      return;
+    }
+    mostrarStatusPdf('Gerando PDF, aguarde...', 'var(--muted)');
+    var alvo = modalCorpo.querySelector('.relatorio-render');
+    var nomeArquivo = 'controle-de-gastos-' + C.mesAtual + '.pdf';
+
+    html2pdf().set({
+      margin: 10,
+      filename: nomeArquivo,
+      html2canvas: { scale: 2, useCORS: true },
+      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
+      pagebreak: { mode: ['css', 'avoid-all'] }
+    }).from(alvo).save().then(function(){
+      mostrarStatusPdf('PDF baixado com sucesso! ✓', 'var(--green)');
+    }).catch(function(erro){
+      console.error('Erro ao gerar PDF:', erro);
+      mostrarStatusPdf('Algo deu errado ao gerar o PDF. Tente o botão "Imprimir" como alternativa.', 'var(--red)');
+    });
   });
 
   R.cancelarEdicoes = function(){
