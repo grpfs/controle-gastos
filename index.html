@@ -9,7 +9,6 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
 
 <style>
   :root{
@@ -395,7 +394,7 @@
       </select>
       <button class="btn-pdf" id="btn-gerar-pdf" type="button">Gerar relatório em PDF</button>
     </div>
-    <p style="color:var(--muted);font-size:13px;margin-top:10px;">Isso abre a janela de impressão do navegador — escolha "Salvar como PDF" no destino.</p>
+    <p style="color:var(--muted);font-size:13px;margin-top:10px;">Uma nova aba abrirá com o relatório. Na janela de impressão, escolha <strong>Salvar como PDF</strong> no destino de impressão. O botão "Imprimir" no modal também abre essa mesma janela diretamente.</p>
   </section>
 
 </main>
@@ -1170,44 +1169,95 @@
   });
 
   document.getElementById('btn-baixar-pdf').addEventListener('click', function(){
-    if (typeof html2pdf === 'undefined'){
-      mostrarStatusPdf('Não foi possível carregar o gerador de PDF (verifique sua conexão com a internet). Use o botão "Imprimir" e escolha "Salvar como PDF" como alternativa.', 'var(--red)');
+    mostrarStatusPdf('Preparando PDF...', 'var(--muted)');
+
+    var conteudo = modalCorpo.querySelector('.relatorio-render').outerHTML;
+    var escopo = document.getElementById('escopo-relatorio').value;
+    var titulo = 'Controle de Gastos — ' + (escopo === 'todos' ? 'Todos os meses' : C.nomeMesExtenso(C.mesAtual));
+
+    var estilosRelatorio = [
+      'body{margin:0;padding:20px;font-family:"Inter",Arial,sans-serif;color:#15181F;background:#fff;}',
+      '.relatorio-render{font-family:"Inter",Arial,sans-serif;color:#15181F;font-size:13px;background:#fff;max-width:780px;margin:0 auto;padding:32px 36px;}',
+      '.relatorio-render .rel-cabecalho{display:flex;justify-content:space-between;align-items:flex-end;border-bottom:3px solid #0F6E66;padding-bottom:12px;margin-bottom:18px;}',
+      '.relatorio-render .rel-marca{font-family:"Space Grotesk",Arial,sans-serif;font-weight:700;font-size:14px;color:#0F6E66;}',
+      '.relatorio-render .rel-marca small{display:block;font-weight:400;color:#777;font-size:10.5px;}',
+      '.relatorio-render .rel-meta{text-align:right;font-size:10.5px;color:#777;}',
+      '.relatorio-render h1{font-family:"Space Grotesk",Arial,sans-serif;font-size:24px;margin:0 0 3px;color:#0B4F49;}',
+      '.relatorio-render .rel-situacao{display:flex;align-items:center;gap:10px;border-radius:6px;padding:10px 14px;margin-bottom:18px;font-size:13px;font-weight:600;}',
+      '.relatorio-render .rel-situacao.ok{background:#EAF6F1;color:#0B4F49;border:1px solid #BFE0D8;}',
+      '.relatorio-render .rel-situacao.alerta{background:#FDEEEC;color:#8A271F;border:1px solid #F3C8C3;}',
+      '.relatorio-render .rel-visao-geral{background:#F2F7F6;border:1px solid #BFE0D8;border-radius:8px;padding:16px 18px;margin-bottom:24px;}',
+      '.relatorio-render .rel-visao-geral h1{font-size:18px;}',
+      '.relatorio-render .rel-evolucao{width:100%;border-collapse:collapse;margin-top:10px;font-size:11.5px;}',
+      '.relatorio-render .rel-evolucao th,.relatorio-render .rel-evolucao td{padding:6px 7px;border-bottom:1px solid #D4E3DF;text-align:right;}',
+      '.relatorio-render .rel-evolucao th:first-child,.relatorio-render .rel-evolucao td:first-child{text-align:left;}',
+      '.relatorio-render h2{font-family:"Space Grotesk",Arial,sans-serif;font-size:14.5px;margin:24px 0 12px;color:#0B4F49;border-bottom:1.5px solid #0F6E66;padding-bottom:6px;display:flex;align-items:center;gap:6px;}',
+      '.relatorio-render .resumo-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:9px;margin-bottom:4px;}',
+      '.relatorio-render .resumo-card{border:1px solid #D8DDE3;border-radius:6px;padding:10px 11px;background:#FAFBFC;}',
+      '.relatorio-render .resumo-card .icone-card{font-size:14px;}',
+      '.relatorio-render .resumo-card .rotulo{font-size:9.5px;text-transform:uppercase;letter-spacing:0.3px;color:#777;margin-top:3px;}',
+      '.relatorio-render .resumo-card .valor{font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:15px;margin-top:2px;}',
+      '.relatorio-render .resumo-card.negativo .valor{color:#A6332B;}',
+      '.relatorio-render .resumo-card.positivo .valor{color:#0F6E66;}',
+      '.relatorio-render .barra-essencial{display:flex;height:20px;border-radius:5px;overflow:hidden;margin:10px 0 6px;}',
+      '.relatorio-render .barra-essencial .seg-essencial{background:#0F6E66;}',
+      '.relatorio-render .barra-essencial .seg-nao-essencial{background:#B9791E;}',
+      '.relatorio-render .legenda-essencial{display:flex;gap:16px;font-size:10.5px;color:#666;margin-bottom:20px;}',
+      '.relatorio-render .legenda-essencial span{display:inline-flex;align-items:center;gap:5px;}',
+      '.relatorio-render .legenda-essencial i{width:9px;height:9px;border-radius:2px;display:inline-block;}',
+      '.relatorio-render .grupo-prioridade{margin-bottom:14px;}',
+      '.relatorio-render .grupo-prioridade h3{font-family:"Inter",Arial,sans-serif;font-size:11.5px;text-transform:uppercase;letter-spacing:0.4px;margin:0 0 8px;display:flex;align-items:center;gap:6px;font-weight:700;}',
+      '.relatorio-render .grupo-prioridade.alta h3{color:#A6332B;}',
+      '.relatorio-render .grupo-prioridade.media h3{color:#B9791E;}',
+      '.relatorio-render .grupo-prioridade.baixa h3{color:#2D6A4F;}',
+      '.relatorio-render .item-prioridade{display:flex;align-items:center;gap:10px;padding:8px 10px;border:1px solid #E0E4E9;border-left:4px solid #999;border-radius:5px;margin-bottom:6px;}',
+      '.relatorio-render .grupo-prioridade.alta .item-prioridade{border-left-color:#A6332B;background:#FCF2F1;}',
+      '.relatorio-render .grupo-prioridade.media .item-prioridade{border-left-color:#B9791E;background:#FDF8EF;}',
+      '.relatorio-render .grupo-prioridade.baixa .item-prioridade{border-left-color:#2D6A4F;background:#F2F8F5;}',
+      '.relatorio-render .item-prioridade .check{font-size:14px;color:#999;flex-shrink:0;}',
+      '.relatorio-render .item-prioridade .info{flex:1;}',
+      '.relatorio-render .item-prioridade .info strong{font-size:12.5px;}',
+      '.relatorio-render .item-prioridade .info small{display:block;color:#666;font-size:10.5px;margin-top:1px;}',
+      '.relatorio-render .item-prioridade .valor-item{font-family:"IBM Plex Mono",monospace;font-weight:700;font-size:13px;flex-shrink:0;width:90px;text-align:right;}',
+      '.relatorio-render .tag-atrasado{display:inline-block;background:#A6332B;color:#fff;font-size:9px;font-weight:700;padding:1px 6px;border-radius:8px;margin-left:6px;}',
+      '.relatorio-render .sem-pendencias{color:#0F6E66;font-size:12.5px;font-weight:600;background:#EAF6F1;border-radius:6px;padding:10px 12px;}',
+      '.relatorio-render table.rel-tabela{width:100%;border-collapse:collapse;font-size:11.5px;margin-bottom:6px;}',
+      '.relatorio-render table.rel-tabela th{background:#0F6E66;color:#fff;font-size:9.5px;text-transform:uppercase;letter-spacing:0.3px;padding:7px 8px;text-align:left;}',
+      '.relatorio-render table.rel-tabela th.num,.relatorio-render table.rel-tabela td.num{text-align:right;font-family:"IBM Plex Mono",monospace;}',
+      '.relatorio-render table.rel-tabela td{padding:6px 8px;border-bottom:1px solid #E5E8EC;}',
+      '.relatorio-render table.rel-tabela tr:nth-child(even) td{background:#F7F9FA;}',
+      '.relatorio-render table.rel-tabela tr.linha-negativa td{background:#FBEAE8!important;color:#A6332B;font-weight:700;}',
+      '.relatorio-render table.rel-tabela tr.linha-paga-rel td{color:#999;text-decoration:line-through;}',
+      '.relatorio-render .barra-cat-rel{display:flex;align-items:center;gap:8px;margin-bottom:6px;font-size:11.5px;}',
+      '.relatorio-render .barra-cat-rel .nome{width:130px;flex-shrink:0;}',
+      '.relatorio-render .barra-cat-rel .trilho{flex:1;background:#EEF1F5;border-radius:4px;height:11px;overflow:hidden;}',
+      '.relatorio-render .barra-cat-rel .preenchido{background:#0F6E66;height:100%;}',
+      '.relatorio-render .barra-cat-rel .valor{font-family:"IBM Plex Mono",monospace;width:80px;text-align:right;flex-shrink:0;}',
+      '.relatorio-render .barra-cat-rel .pct{font-family:"IBM Plex Mono",monospace;width:40px;text-align:right;flex-shrink:0;color:#777;font-size:10.5px;}',
+      '.relatorio-render .rel-rodape{margin-top:20px;padding-top:10px;border-top:1px solid #D8DDE3;font-size:9.5px;color:#999;}',
+      '.relatorio-render .secao-mes+.secao-mes{margin-top:34px;border-top:2px dashed #D8DDE3;padding-top:28px;}',
+      '@media print{@page{margin:12mm 10mm;} .secao-mes{page-break-before:always;} .secao-mes:first-of-type{page-break-before:auto;} .secao-mes+.secao-mes{border-top:none;padding-top:0;margin-top:0;}}'
+    ].join('\n');
+
+    var htmlCompleto = '<!DOCTYPE html>\n<html lang="pt-BR">\n<head>\n' +
+      '<meta charset="UTF-8">\n' +
+      '<title>' + titulo + '</title>\n' +
+      '<link rel="preconnect" href="https://fonts.googleapis.com">\n' +
+      '<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">\n' +
+      '<style>' + estilosRelatorio + '</style>\n' +
+      '</head>\n<body>\n' + conteudo + '\n' +
+      '<script>window.addEventListener("load",function(){setTimeout(function(){window.print();},600);});<\/script>\n' +
+      '</body>\n</html>';
+
+    var janela = window.open('', '_blank', 'width=900,height=700');
+    if (!janela){
+      mostrarStatusPdf('O navegador bloqueou a nova aba. Permita pop-ups para este site e tente novamente.', 'var(--red)');
       return;
     }
-    mostrarStatusPdf('Gerando PDF, aguarde...', 'var(--muted)');
-
-    // O html2pdf renderiza via html2canvas, que captura branco quando o elemento
-    // está dentro de um container com overflow:hidden / max-height (o modal).
-    // Solução: clonar o conteúdo para um div temporário FORA do modal,
-    // renderizar a partir daí, e remover em seguida.
-    var alvo = modalCorpo.querySelector('.relatorio-render');
-    var temp = document.createElement('div');
-    temp.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;background:#fff;z-index:-1;';
-    temp.appendChild(alvo.cloneNode(true));
-    document.body.appendChild(temp);
-
-    var escopo = document.getElementById('escopo-relatorio').value;
-    var nomeArquivo = 'controle-de-gastos-' + (escopo === 'todos' ? 'todos-os-meses' : C.mesAtual) + '.pdf';
-
-    html2pdf().set({
-      margin: [10, 10, 10, 10],
-      filename: nomeArquivo,
-      html2canvas: {
-        scale: 2,
-        useCORS: true,
-        logging: false,
-        backgroundColor: '#ffffff'
-      },
-      jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-      pagebreak: { mode: ['css', 'avoid-all'] }
-    }).from(temp).save().then(function(){
-      document.body.removeChild(temp);
-      mostrarStatusPdf('PDF baixado com sucesso! ✓', 'var(--green)');
-    }).catch(function(erro){
-      if (document.body.contains(temp)) document.body.removeChild(temp);
-      console.error('Erro ao gerar PDF:', erro);
-      mostrarStatusPdf('Algo deu errado ao gerar o PDF. Tente o botão "Imprimir" como alternativa.', 'var(--red)');
-    });
+    janela.document.open();
+    janela.document.write(htmlCompleto);
+    janela.document.close();
+    mostrarStatusPdf('Uma nova aba foi aberta — escolha "Salvar como PDF" na janela de impressão. ✓', 'var(--green)');
   });
 
   R.cancelarEdicoes = function(){
