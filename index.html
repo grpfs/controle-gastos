@@ -1175,18 +1175,36 @@
       return;
     }
     mostrarStatusPdf('Gerando PDF, aguarde...', 'var(--muted)');
+
+    // O html2pdf renderiza via html2canvas, que captura branco quando o elemento
+    // está dentro de um container com overflow:hidden / max-height (o modal).
+    // Solução: clonar o conteúdo para um div temporário FORA do modal,
+    // renderizar a partir daí, e remover em seguida.
     var alvo = modalCorpo.querySelector('.relatorio-render');
-    var nomeArquivo = 'controle-de-gastos-' + C.mesAtual + '.pdf';
+    var temp = document.createElement('div');
+    temp.style.cssText = 'position:absolute;left:-9999px;top:0;width:800px;background:#fff;z-index:-1;';
+    temp.appendChild(alvo.cloneNode(true));
+    document.body.appendChild(temp);
+
+    var escopo = document.getElementById('escopo-relatorio').value;
+    var nomeArquivo = 'controle-de-gastos-' + (escopo === 'todos' ? 'todos-os-meses' : C.mesAtual) + '.pdf';
 
     html2pdf().set({
-      margin: 10,
+      margin: [10, 10, 10, 10],
       filename: nomeArquivo,
-      html2canvas: { scale: 2, useCORS: true },
+      html2canvas: {
+        scale: 2,
+        useCORS: true,
+        logging: false,
+        backgroundColor: '#ffffff'
+      },
       jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
       pagebreak: { mode: ['css', 'avoid-all'] }
-    }).from(alvo).save().then(function(){
+    }).from(temp).save().then(function(){
+      document.body.removeChild(temp);
       mostrarStatusPdf('PDF baixado com sucesso! ✓', 'var(--green)');
     }).catch(function(erro){
+      if (document.body.contains(temp)) document.body.removeChild(temp);
       console.error('Erro ao gerar PDF:', erro);
       mostrarStatusPdf('Algo deu errado ao gerar o PDF. Tente o botão "Imprimir" como alternativa.', 'var(--red)');
     });
