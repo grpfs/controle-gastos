@@ -1365,12 +1365,17 @@
             var pct = despTotal2>0 ? c.val/despTotal2*100 : 0;
             var barW = Math.max(2, (c.val/maxCat)*100);
             doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
-            doc.text(c.cat, mg, y+4);
-            doc.setFillColor(230,235,230); doc.rect(mg+42, y, 80, 5, 'F');
-            doc.setFillColor(TEAL2[0],TEAL2[1],TEAL2[2]); doc.rect(mg+42, y, barW*0.8, 5, 'F');
-            doc.setTextColor(80,80,80);
-            doc.text(C.formatarBRL(c.val), mg+128, y+4, {align:'right'});
-            doc.text(pct.toFixed(0)+'%', mg+140, y+4, {align:'right'});
+            doc.text(c.cat.substring(0,22), mg, y+4);
+            // trilho cinza fixo de 70mm
+            doc.setFillColor(220,225,220); doc.rect(mg+46, y, 70, 5, 'F');
+            // preenchimento proporcional
+            doc.setFillColor(TEAL2[0],TEAL2[1],TEAL2[2]); doc.rect(mg+46, y, barW*0.7, 5, 'F');
+            // valor à direita, bem afastado da barra
+            doc.setTextColor(40,40,40);
+            doc.text(C.formatarBRL(c.val), pW-mg-16, y+4, {align:'right'});
+            // percentual na extremidade direita
+            doc.setTextColor(120,120,120);
+            doc.text(pct.toFixed(0)+'%', pW-mg, y+4, {align:'right'});
             y += 7;
           });
           y += 3;
