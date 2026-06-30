@@ -9,6 +9,7 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+<script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
@@ -1171,276 +1172,89 @@
   });
 
   document.getElementById('btn-baixar-pdf').addEventListener('click', function(){
-    if (!window.jspdf || !window.jspdf.jsPDF){
-      mostrarStatusPdf('Biblioteca PDF ainda carregando. Aguarde alguns segundos e tente novamente.', 'var(--amber)');
+    if (typeof html2canvas === 'undefined' || !window.jspdf){
+      mostrarStatusPdf('Bibliotecas de PDF ainda carregando. Aguarde alguns segundos e tente novamente.', 'var(--amber)');
       return;
     }
 
     var btnBaixar = document.getElementById('btn-baixar-pdf');
-    btnBaixar.disabled = true;
-    mostrarStatusPdf('Gerando PDF...', 'var(--muted)');
-
-    try {
-      var escopo = document.getElementById('escopo-relatorio').value;
-      var meses = escopo === 'todos' ? Object.keys(C.mesesData).sort() : [C.mesAtual];
-      if (!meses.length) meses = [C.mesAtual];
-
-      var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
-      var pW = doc.internal.pageSize.getWidth();
-      var pH = doc.internal.pageSize.getHeight();
-      var mg = 12;
-      var cW = pW - mg * 2;
-      var TEAL  = [11, 79, 73];
-      var TEAL2 = [15, 110, 102];
-      var GREEN = [45, 106, 79];
-      var AMBER = [185, 121, 30];
-      var RED   = [166, 51, 43];
-      var GRAY  = [92, 100, 120];
-
-      function addCabecalho(doc, mes){
-        // Barra de topo
-        doc.setFillColor(TEAL[0], TEAL[1], TEAL[2]);
-        doc.rect(0, 0, pW, 16, 'F');
-        doc.setTextColor(255,255,255);
-        doc.setFontSize(11); doc.setFont('helvetica','bold');
-        doc.text('CalculaBR - Controle de Gastos', mg, 10);
-        doc.setFontSize(8); doc.setFont('helvetica','normal');
-        doc.text('Gerado em ' + new Date().toLocaleDateString('pt-BR'), pW - mg, 10, {align:'right'});
-
-        // Título do mês
-        var y = 24;
-        doc.setTextColor(TEAL[0],TEAL[1],TEAL[2]);
-        doc.setFontSize(17); doc.setFont('helvetica','bold');
-        doc.text(C.nomeMesExtenso(mes), mg, y);
-        return y + 8;
-      }
-
-      function addResumoCards(doc, dados, y){
-        var renda        = R.totalRendas(dados);
-        var despTotal    = R.totalDespesas(dados);
-        var essencial    = dados.despesas.filter(function(d){return d.essencial;}).reduce(function(s,d){return s+d.valor;},0);
-        var naoEssencial = despTotal - essencial;
-        var saldo        = renda - despTotal;
-
-        var bW = (cW - 9) / 4;
-        var cards = [
-          {label:'Renda total',          valor:C.formatarBRL(renda),        cor:TEAL2},
-          {label:'Essenciais',           valor:C.formatarBRL(essencial),     cor:GRAY},
-          {label:'Não essenciais',       valor:C.formatarBRL(naoEssencial),  cor:AMBER},
-          {label:'Saldo previsto',       valor:C.formatarBRL(saldo),         cor:saldo<0?RED:GREEN}
-        ];
-        cards.forEach(function(c, i){
-          var bx = mg + i * (bW + 3);
-          doc.setFillColor(245,247,250); doc.setDrawColor(216,221,227); doc.setLineWidth(0.3);
-          doc.roundedRect(bx, y, bW, 17, 2, 2, 'FD');
-          doc.setFontSize(7); doc.setFont('helvetica','normal');
-          doc.setTextColor(130,130,130);
-          doc.text(c.label.toUpperCase(), bx+3, y+6);
-          doc.setFontSize(10); doc.setFont('helvetica','bold');
-          doc.setTextColor(c.cor[0],c.cor[1],c.cor[2]);
-          doc.text(c.valor, bx+3, y+13.5);
-        });
-        return y + 22;
-      }
-
-      function addSecaoTitulo(doc, texto, y){
-        if (y > pH - 40){ doc.addPage(); addRodape(doc); y = 20; }
-        doc.setTextColor(TEAL[0],TEAL[1],TEAL[2]);
-        doc.setFontSize(10); doc.setFont('helvetica','bold');
-        doc.text(texto, mg, y);
-        doc.setDrawColor(TEAL2[0],TEAL2[1],TEAL2[2]); doc.setLineWidth(0.4);
-        doc.line(mg, y+1.5, pW-mg, y+1.5);
-        return y + 7;
-      }
-
-      function addRodape(doc){
-        var total = doc.internal.getNumberOfPages();
-        for (var i = 1; i <= total; i++){
-          doc.setPage(i);
-          doc.setFontSize(7); doc.setTextColor(170,170,170); doc.setFont('helvetica','normal');
-          doc.text('Relatório gerado por CalculaBR - uso pessoal - nao substitui extratos bancarios oficiais', mg, pH-5);
-          doc.text('Página ' + i + ' / ' + total, pW-mg, pH-5, {align:'right'});
-        }
-      }
-
-      var PRIO_COR = {alta:RED, media:AMBER, baixa:GREEN};
-      var PRIO_BG  = {alta:[252,242,241], media:[253,248,239], baixa:[242,248,245]};
-
-      meses.forEach(function(mes, idx){
-        if (idx > 0) doc.addPage();
-        var dados = C.dadosDoMes(mes);
-        var y = addCabecalho(doc, mes);
-        y = addResumoCards(doc, dados, y);
-
-        // Situação do mês
-        var eventos = R.construirFluxo(dados);
-        var primNeg = eventos.find(function(e){return e.saldoAcumulado < 0;});
-        if (primNeg){
-          doc.setFillColor(253,238,236); doc.setDrawColor(243,200,195); doc.setLineWidth(0.3);
-          doc.roundedRect(mg, y, cW, 9, 2, 2, 'FD');
-          doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(138,39,31);
-          doc.text('(!) Saldo negativo a partir de ' + C.formatarDataBR(primNeg.data) + '. Revise a ordem de pagamento.', mg+3, y+6);
-          y += 13;
-        } else if (eventos.length > 0){
-          doc.setFillColor(234,246,241); doc.setDrawColor(191,224,216); doc.setLineWidth(0.3);
-          doc.roundedRect(mg, y, cW, 9, 2, 2, 'FD');
-          doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(11,79,73);
-          doc.text('OK  Saldo permanece positivo durante todo o mes.', mg+3, y+6);
-          y += 13;
-        }
-
-        // Prioridade de pagamento
-        y = addSecaoTitulo(doc, 'ORDEM DE PRIORIDADE PARA PAGAR', y);
-        var pendentes = dados.despesas.filter(function(d){return !d.pago;}).slice().sort(function(a,b){
-          var ra=C.RANK_PRIORIDADE[a.prioridade], rb=C.RANK_PRIORIDADE[b.prioridade];
-          return ra!==rb ? ra-rb : a.dataVenc.localeCompare(b.dataVenc);
-        });
-
-        if (!pendentes.length){
-          doc.setFontSize(9); doc.setTextColor(GREEN[0],GREEN[1],GREEN[2]); doc.setFont('helvetica','bold');
-          doc.text('[ Tudo pago neste mes ]', mg, y); y += 8;
-        } else {
-          pendentes.forEach(function(d){
-            if (y > pH-28){ doc.addPage(); addRodape(doc); y = 20; }
-            var cor = PRIO_COR[d.prioridade];
-            var bg  = PRIO_BG[d.prioridade];
-            doc.setFillColor(bg[0],bg[1],bg[2]); doc.setDrawColor(cor[0],cor[1],cor[2]); doc.setLineWidth(0.3);
-            doc.roundedRect(mg, y, cW, 12, 1.5, 1.5, 'FD');
-            doc.setFillColor(cor[0],cor[1],cor[2]);
-            doc.rect(mg, y, 2.5, 12, 'F');
-            doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(28,34,48);
-            doc.text(d.descricao.substring(0,50), mg+5, y+5.5);
-            doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(110,110,110);
-            var atrasado = d.dataVenc < C.hojeISO() ? ' - ATRASADO' : '';
-            doc.text(d.categoria + ' - Vence ' + C.formatarDataBR(d.dataVenc) + atrasado, mg+5, y+10);
-            doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(cor[0],cor[1],cor[2]);
-            doc.text(C.formatarBRL(d.valor), pW-mg, y+6.5, {align:'right'});
-            y += 15; // box 12mm + 3mm gap
-          });
-          y += 4; // espaço extra após o último item antes da próxima seção
-        }
-
-        // Fluxo de caixa
-        if (eventos.length){
-          if (y > pH-50){ doc.addPage(); addRodape(doc); y = 20; }
-          y = addSecaoTitulo(doc, 'FLUXO DE CAIXA POR DATA', y);
-          doc.autoTable({
-            startY: y,
-            head: [['Data','Descricao','Tipo','Valor','Saldo Acumulado']],
-            body: eventos.map(function(e){
-              return [
-                C.formatarDataBR(e.data),
-                e.descricao,
-                e.tipo==='entrada'?'Entrada':'Saída',
-                (e.valor>=0?'+':'')+C.formatarBRL(e.valor),
-                C.formatarBRL(e.saldoAcumulado)+(e.saldoAcumulado<0?' (!)':'')
-              ];
-            }),
-            styles:{fontSize:8, cellPadding:2.2},
-            headStyles:{fillColor:TEAL2, textColor:255, fontStyle:'bold', fontSize:8},
-            columnStyles:{3:{halign:'right'}, 4:{halign:'right'}},
-            alternateRowStyles:{fillColor:[247,249,250]},
-            didParseCell:function(data){
-              if (data.section==='body' && data.row.raw[4] && data.row.raw[4].includes('(!)')){
-                data.cell.styles.textColor = RED;
-                data.cell.styles.fontStyle = 'bold';
-              }
-            },
-            margin:{left:mg, right:mg}, tableWidth:cW, theme:'striped'
-          });
-          y = doc.lastAutoTable.finalY + 6;
-        }
-
-        // Categorias
-        var somasCat = {};
-        dados.despesas.forEach(function(d){ somasCat[d.categoria]=(somasCat[d.categoria]||0)+d.valor; });
-        var listaCat = Object.keys(somasCat).map(function(k){return{cat:k,val:somasCat[k]};}).sort(function(a,b){return b.val-a.val;});
-        if (listaCat.length){
-          if (y > pH-50){ doc.addPage(); addRodape(doc); y = 20; }
-          y = addSecaoTitulo(doc, 'GASTOS POR CATEGORIA', y);
-          var maxCat = listaCat[0].val;
-          var despTotal2 = R.totalDespesas(dados);
-          listaCat.forEach(function(c){
-            if (y > pH-18){ doc.addPage(); addRodape(doc); y = 20; }
-            var pct = despTotal2>0 ? c.val/despTotal2*100 : 0;
-            var barW = Math.max(2, (c.val/maxCat)*100);
-            doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
-            doc.text(c.cat.substring(0,22), mg, y+4);
-            // trilho cinza fixo de 70mm
-            doc.setFillColor(220,225,220); doc.rect(mg+46, y, 70, 5, 'F');
-            // preenchimento proporcional
-            doc.setFillColor(TEAL2[0],TEAL2[1],TEAL2[2]); doc.rect(mg+46, y, barW*0.7, 5, 'F');
-            // valor à direita, bem afastado da barra
-            doc.setTextColor(40,40,40);
-            doc.text(C.formatarBRL(c.val), pW-mg-16, y+4, {align:'right'});
-            // percentual na extremidade direita
-            doc.setTextColor(120,120,120);
-            doc.text(pct.toFixed(0)+'%', pW-mg, y+4, {align:'right'});
-            y += 7;
-          });
-          y += 3;
-        }
-
-        // Tabela completa de despesas
-        if (dados.despesas.length){
-          if (y > pH-50){ doc.addPage(); addRodape(doc); y = 20; }
-          y = addSecaoTitulo(doc, 'DETALHAMENTO COMPLETO DE DESPESAS', y);
-          doc.autoTable({
-            startY: y,
-            head: [['Descrição','Categoria','Vencimento','Valor','Tipo','Status']],
-            body: dados.despesas.slice().sort(function(a,b){return a.dataVenc.localeCompare(b.dataVenc);}).map(function(d){
-              return [d.descricao, d.categoria, C.formatarDataBR(d.dataVenc), C.formatarBRL(d.valor), d.essencial?'Essencial':'Não essencial', d.pago?'Pago':'Pendente'];
-            }),
-            styles:{fontSize:8, cellPadding:2.2},
-            headStyles:{fillColor:TEAL2, textColor:255, fontStyle:'bold', fontSize:8},
-            columnStyles:{3:{halign:'right'}, 5:{halign:'center'}},
-            alternateRowStyles:{fillColor:[247,249,250]},
-            didParseCell:function(data){
-              if (data.section==='body' && data.column.index===5 && data.cell.raw==='Pago'){
-                data.cell.styles.textColor = GREEN;
-              }
-            },
-            margin:{left:mg, right:mg}, tableWidth:cW, theme:'striped'
-          });
-        }
-
-        // Visão geral no final se for multi-mês e for o último
-        if (escopo==='todos' && idx===meses.length-1 && meses.length>1){
-          doc.addPage(); addRodape(doc);
-          var yv = 20;
-          doc.setFillColor(TEAL[0],TEAL[1],TEAL[2]); doc.rect(0,0,pW,16,'F');
-          doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont('helvetica','bold');
-          doc.text('CalculaBR - Visao Geral do Periodo', mg, 10);
-          yv = 28;
-          doc.setTextColor(TEAL[0],TEAL[1],TEAL[2]); doc.setFontSize(15); doc.setFont('helvetica','bold');
-          doc.text('Resumo - ' + meses.length + ' meses', mg, yv); yv += 10;
-          doc.autoTable({
-            startY: yv,
-            head: [['Mês','Renda','Despesas','Saldo']],
-            body: meses.map(function(m){
-              var d2 = C.dadosDoMes(m);
-              var r2 = R.totalRendas(d2), dp2 = R.totalDespesas(d2);
-              return [C.nomeMesExtenso(m), C.formatarBRL(r2), C.formatarBRL(dp2), C.formatarBRL(r2-dp2)];
-            }),
-            styles:{fontSize:9, cellPadding:3, halign:'right'},
-            headStyles:{fillColor:TEAL2, textColor:255, fontStyle:'bold'},
-            columnStyles:{0:{halign:'left'}, 3:{fontStyle:'bold'}},
-            alternateRowStyles:{fillColor:[247,249,250]},
-            margin:{left:mg, right:mg}, tableWidth:cW
-          });
-        }
-      });
-
-      addRodape(doc);
-      doc.save('controle-de-gastos-' + (escopo==='todos'?'todos-os-meses':C.mesAtual) + '.pdf');
-      btnBaixar.disabled = false;
-      mostrarStatusPdf('PDF baixado com sucesso! ✓', 'var(--green)');
-
-    } catch(err){
-      console.error('Erro ao gerar PDF:', err);
-      btnBaixar.disabled = false;
-      mostrarStatusPdf('Erro ao gerar PDF: ' + err.message + '. Use "Imprimir" como alternativa.', 'var(--red)');
+    var modalCaixa = document.querySelector('.modal-pdf-caixa');
+    var alvo = modalCorpo.querySelector('.relatorio-render');
+    if (!alvo){
+      mostrarStatusPdf('Nada para exportar. Gere a pré-visualização primeiro.', 'var(--red)');
+      return;
     }
+
+    btnBaixar.disabled = true;
+    mostrarStatusPdf('Gerando PDF, aguarde...', 'var(--muted)');
+
+    // O modal usa overflow:hidden + max-height para caber na tela com scroll.
+    // Isso corta o conteúdo na hora de capturar. Solução: remover essas
+    // restrições temporariamente (o conteúdo já está 100% visível e renderizado,
+    // só "esticamos" o container para a captura), e restaurar logo depois.
+    var origCaixaOverflow = modalCaixa.style.overflow;
+    var origCaixaMaxHeight = modalCaixa.style.maxHeight;
+    var origCorpoOverflow = modalCorpo.style.overflow;
+    var origCorpoMaxHeight = modalCorpo.style.maxHeight;
+
+    modalCaixa.style.overflow = 'visible';
+    modalCaixa.style.maxHeight = 'none';
+    modalCorpo.style.overflow = 'visible';
+    modalCorpo.style.maxHeight = 'none';
+
+    function restaurarModal(){
+      modalCaixa.style.overflow = origCaixaOverflow;
+      modalCaixa.style.maxHeight = origCaixaMaxHeight;
+      modalCorpo.style.overflow = origCorpoOverflow;
+      modalCorpo.style.maxHeight = origCorpoMaxHeight;
+    }
+
+    // pequena espera para o navegador recalcular o layout sem os limites antigos
+    setTimeout(function(){
+      html2canvas(alvo, {
+        scale: 2,
+        useCORS: true,
+        backgroundColor: '#ffffff',
+        logging: false
+      }).then(function(canvas){
+        restaurarModal();
+
+        var jsPDF = window.jspdf.jsPDF;
+        var pdf = new jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+        var pageW = pdf.internal.pageSize.getWidth();
+        var pageH = pdf.internal.pageSize.getHeight();
+
+        var imgData = canvas.toDataURL('image/jpeg', 0.95);
+        var imgW = pageW;
+        var imgH = (canvas.height * imgW) / canvas.width;
+
+        var heightLeft = imgH;
+        var posY = 0;
+
+        pdf.addImage(imgData, 'JPEG', 0, posY, imgW, imgH);
+        heightLeft -= pageH;
+
+        // Fatia a imagem alta em múltiplas páginas A4, deslocando o Y a cada página
+        while (heightLeft > 0){
+          posY = heightLeft - imgH;
+          pdf.addPage();
+          pdf.addImage(imgData, 'JPEG', 0, posY, imgW, imgH);
+          heightLeft -= pageH;
+        }
+
+        var escopo = document.getElementById('escopo-relatorio').value;
+        var nomeArquivo = 'controle-de-gastos-' + (escopo === 'todos' ? 'todos-os-meses' : C.mesAtual) + '.pdf';
+        pdf.save(nomeArquivo);
+
+        btnBaixar.disabled = false;
+        mostrarStatusPdf('PDF baixado com sucesso! \u2713', 'var(--green)');
+      }).catch(function(err){
+        restaurarModal();
+        console.error('Erro ao gerar PDF:', err);
+        btnBaixar.disabled = false;
+        mostrarStatusPdf('Não foi possível gerar o PDF. Use o botão "Imprimir" como alternativa.', 'var(--red)');
+      });
+    }, 80);
   });
 
   R.cancelarEdicoes = function(){
