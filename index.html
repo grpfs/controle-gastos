@@ -9,7 +9,8 @@
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@500;700&family=Inter:wght@400;500;600&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
-<script src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf-autotable/3.5.28/jspdf.plugin.autotable.min.js"></script>
 
 <style>
   :root{
@@ -1170,66 +1171,270 @@
   });
 
   document.getElementById('btn-baixar-pdf').addEventListener('click', function(){
-    if (typeof html2pdf === 'undefined'){
-      mostrarStatusPdf('Biblioteca de PDF ainda carregando. Aguarde alguns segundos e tente novamente.', 'var(--amber)');
+    if (!window.jspdf || !window.jspdf.jsPDF){
+      mostrarStatusPdf('Biblioteca PDF ainda carregando. Aguarde alguns segundos e tente novamente.', 'var(--amber)');
       return;
     }
 
     var btnBaixar = document.getElementById('btn-baixar-pdf');
     btnBaixar.disabled = true;
-    mostrarStatusPdf('Gerando PDF, aguarde...', 'var(--muted)');
+    mostrarStatusPdf('Gerando PDF...', 'var(--muted)');
 
-    var escopo = document.getElementById('escopo-relatorio').value;
-    var nomeArquivo = 'controle-de-gastos-' + (escopo === 'todos' ? 'todos-os-meses' : C.mesAtual) + '.pdf';
+    try {
+      var escopo = document.getElementById('escopo-relatorio').value;
+      var meses = escopo === 'todos' ? Object.keys(C.mesesData).sort() : [C.mesAtual];
+      if (!meses.length) meses = [C.mesAtual];
 
-    // A causa do PDF em branco com html2pdf é o elemento estar dentro de um
-    // container com overflow:hidden / max-height (o modal).
-    // Solução definitiva: clonar o .relatorio-render para o <body> como
-    // position:fixed com opacity quase zero — tecnicamente "on-screen" para o
-    // html2canvas renderizar corretamente, mas imperceptível para o usuário.
-    var alvo = modalCorpo.querySelector('.relatorio-render');
-    var clone = alvo.cloneNode(true);
-    clone.style.cssText = [
-      'position:fixed',
-      'top:0',
-      'left:0',
-      'width:820px',
-      'background:#fff',
-      'z-index:99999',
-      'opacity:0.01',
-      'pointer-events:none',
-      'overflow:visible',
-      'max-height:none'
-    ].join(';');
-    document.body.appendChild(clone);
+      var doc = new window.jspdf.jsPDF({ unit: 'mm', format: 'a4', orientation: 'portrait' });
+      var pW = doc.internal.pageSize.getWidth();
+      var pH = doc.internal.pageSize.getHeight();
+      var mg = 12;
+      var cW = pW - mg * 2;
+      var TEAL  = [11, 79, 73];
+      var TEAL2 = [15, 110, 102];
+      var GREEN = [45, 106, 79];
+      var AMBER = [185, 121, 30];
+      var RED   = [166, 51, 43];
+      var GRAY  = [92, 100, 120];
 
-    // Aguarda o layout do clone estabilizar antes de capturar
-    setTimeout(function(){
-      html2pdf().set({
-        margin: [8, 8, 8, 8],
-        filename: nomeArquivo,
-        html2canvas: {
-          scale: 2,
-          useCORS: true,
-          logging: false,
-          backgroundColor: '#ffffff',
-          windowWidth: 860,
-          scrollX: 0,
-          scrollY: 0
-        },
-        jsPDF: { unit: 'mm', format: 'a4', orientation: 'portrait' },
-        pagebreak: { mode: 'avoid-all' }
-      }).from(clone).save().then(function(){
-        if (document.body.contains(clone)) document.body.removeChild(clone);
-        btnBaixar.disabled = false;
-        mostrarStatusPdf('PDF baixado com sucesso! ✓', 'var(--green)');
-      }).catch(function(err){
-        console.error('html2pdf erro:', err);
-        if (document.body.contains(clone)) document.body.removeChild(clone);
-        btnBaixar.disabled = false;
-        mostrarStatusPdf('Não foi possível gerar o PDF. Use o botão "Imprimir" como alternativa.', 'var(--red)');
+      function addCabecalho(doc, mes){
+        // Barra de topo
+        doc.setFillColor(TEAL[0], TEAL[1], TEAL[2]);
+        doc.rect(0, 0, pW, 16, 'F');
+        doc.setTextColor(255,255,255);
+        doc.setFontSize(11); doc.setFont('helvetica','bold');
+        doc.text('CalculaBR — Controle de Gastos', mg, 10);
+        doc.setFontSize(8); doc.setFont('helvetica','normal');
+        doc.text('Gerado em ' + new Date().toLocaleDateString('pt-BR'), pW - mg, 10, {align:'right'});
+
+        // Título do mês
+        var y = 24;
+        doc.setTextColor(TEAL[0],TEAL[1],TEAL[2]);
+        doc.setFontSize(17); doc.setFont('helvetica','bold');
+        doc.text(C.nomeMesExtenso(mes), mg, y);
+        return y + 8;
+      }
+
+      function addResumoCards(doc, dados, y){
+        var renda        = R.totalRendas(dados);
+        var despTotal    = R.totalDespesas(dados);
+        var essencial    = dados.despesas.filter(function(d){return d.essencial;}).reduce(function(s,d){return s+d.valor;},0);
+        var naoEssencial = despTotal - essencial;
+        var saldo        = renda - despTotal;
+
+        var bW = (cW - 9) / 4;
+        var cards = [
+          {label:'Renda total',          valor:C.formatarBRL(renda),        cor:TEAL2},
+          {label:'Essenciais',           valor:C.formatarBRL(essencial),     cor:GRAY},
+          {label:'Não essenciais',       valor:C.formatarBRL(naoEssencial),  cor:AMBER},
+          {label:'Saldo previsto',       valor:C.formatarBRL(saldo),         cor:saldo<0?RED:GREEN}
+        ];
+        cards.forEach(function(c, i){
+          var bx = mg + i * (bW + 3);
+          doc.setFillColor(245,247,250); doc.setDrawColor(216,221,227); doc.setLineWidth(0.3);
+          doc.roundedRect(bx, y, bW, 17, 2, 2, 'FD');
+          doc.setFontSize(7); doc.setFont('helvetica','normal');
+          doc.setTextColor(130,130,130);
+          doc.text(c.label.toUpperCase(), bx+3, y+6);
+          doc.setFontSize(10); doc.setFont('helvetica','bold');
+          doc.setTextColor(c.cor[0],c.cor[1],c.cor[2]);
+          doc.text(c.valor, bx+3, y+13.5);
+        });
+        return y + 22;
+      }
+
+      function addSecaoTitulo(doc, texto, y){
+        if (y > pH - 40){ doc.addPage(); addRodape(doc); y = 20; }
+        doc.setTextColor(TEAL[0],TEAL[1],TEAL[2]);
+        doc.setFontSize(10); doc.setFont('helvetica','bold');
+        doc.text(texto, mg, y);
+        doc.setDrawColor(TEAL2[0],TEAL2[1],TEAL2[2]); doc.setLineWidth(0.4);
+        doc.line(mg, y+1.5, pW-mg, y+1.5);
+        return y + 7;
+      }
+
+      function addRodape(doc){
+        var total = doc.internal.getNumberOfPages();
+        for (var i = 1; i <= total; i++){
+          doc.setPage(i);
+          doc.setFontSize(7); doc.setTextColor(170,170,170); doc.setFont('helvetica','normal');
+          doc.text('Relatório gerado por CalculaBR · uso pessoal · não substitui extratos bancários oficiais', mg, pH-5);
+          doc.text('Página ' + i + ' / ' + total, pW-mg, pH-5, {align:'right'});
+        }
+      }
+
+      var PRIO_COR = {alta:RED, media:AMBER, baixa:GREEN};
+      var PRIO_BG  = {alta:[252,242,241], media:[253,248,239], baixa:[242,248,245]};
+
+      meses.forEach(function(mes, idx){
+        if (idx > 0) doc.addPage();
+        var dados = C.dadosDoMes(mes);
+        var y = addCabecalho(doc, mes);
+        y = addResumoCards(doc, dados, y);
+
+        // Situação do mês
+        var eventos = R.construirFluxo(dados);
+        var primNeg = eventos.find(function(e){return e.saldoAcumulado < 0;});
+        if (primNeg){
+          doc.setFillColor(253,238,236); doc.setDrawColor(243,200,195); doc.setLineWidth(0.3);
+          doc.roundedRect(mg, y, cW, 9, 2, 2, 'FD');
+          doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(138,39,31);
+          doc.text('⚠ Saldo negativo a partir de ' + C.formatarDataBR(primNeg.data) + '. Revise a ordem de pagamento.', mg+3, y+6);
+          y += 13;
+        } else if (eventos.length > 0){
+          doc.setFillColor(234,246,241); doc.setDrawColor(191,224,216); doc.setLineWidth(0.3);
+          doc.roundedRect(mg, y, cW, 9, 2, 2, 'FD');
+          doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(11,79,73);
+          doc.text('✓ Saldo permanece positivo durante todo o mês.', mg+3, y+6);
+          y += 13;
+        }
+
+        // Prioridade de pagamento
+        y = addSecaoTitulo(doc, 'ORDEM DE PRIORIDADE PARA PAGAR', y);
+        var pendentes = dados.despesas.filter(function(d){return !d.pago;}).slice().sort(function(a,b){
+          var ra=C.RANK_PRIORIDADE[a.prioridade], rb=C.RANK_PRIORIDADE[b.prioridade];
+          return ra!==rb ? ra-rb : a.dataVenc.localeCompare(b.dataVenc);
+        });
+
+        if (!pendentes.length){
+          doc.setFontSize(9); doc.setTextColor(GREEN[0],GREEN[1],GREEN[2]); doc.setFont('helvetica','bold');
+          doc.text('✓ Tudo pago neste mês.', mg, y); y += 8;
+        } else {
+          pendentes.forEach(function(d){
+            if (y > pH-28){ doc.addPage(); addRodape(doc); y = 20; }
+            var cor = PRIO_COR[d.prioridade];
+            var bg  = PRIO_BG[d.prioridade];
+            doc.setFillColor(bg[0],bg[1],bg[2]); doc.setDrawColor(cor[0],cor[1],cor[2]); doc.setLineWidth(0.3);
+            doc.roundedRect(mg, y, cW, 11, 1.5, 1.5, 'FD');
+            doc.setFillColor(cor[0],cor[1],cor[2]);
+            doc.rect(mg, y, 2.5, 11, 'F');
+            doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(28,34,48);
+            doc.text(d.descricao.substring(0,50), mg+5, y+5);
+            doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(110,110,110);
+            var atrasado = d.dataVenc < C.hojeISO() ? ' ⚠ ATRASADO' : '';
+            doc.text(d.categoria + ' · Vence ' + C.formatarDataBR(d.dataVenc) + atrasado, mg+5, y+9.5);
+            doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(cor[0],cor[1],cor[2]);
+            doc.text(C.formatarBRL(d.valor), pW-mg, y+6, {align:'right'});
+            y += 13;
+          });
+        }
+
+        // Fluxo de caixa
+        if (eventos.length){
+          if (y > pH-50){ doc.addPage(); addRodape(doc); y = 20; }
+          y = addSecaoTitulo(doc, 'FLUXO DE CAIXA POR DATA', y);
+          doc.autoTable({
+            startY: y,
+            head: [['Data','Descrição','Tipo','Valor','Saldo Acumulado']],
+            body: eventos.map(function(e){
+              return [
+                C.formatarDataBR(e.data),
+                e.descricao,
+                e.tipo==='entrada'?'Entrada':'Saída',
+                (e.valor>=0?'+':'')+C.formatarBRL(e.valor),
+                C.formatarBRL(e.saldoAcumulado)+(e.saldoAcumulado<0?' ⚠':'')
+              ];
+            }),
+            styles:{fontSize:8, cellPadding:2.2},
+            headStyles:{fillColor:TEAL2, textColor:255, fontStyle:'bold', fontSize:8},
+            columnStyles:{3:{halign:'right'}, 4:{halign:'right'}},
+            alternateRowStyles:{fillColor:[247,249,250]},
+            didParseCell:function(data){
+              if (data.section==='body' && data.row.raw[4] && data.row.raw[4].includes('⚠')){
+                data.cell.styles.textColor = RED;
+                data.cell.styles.fontStyle = 'bold';
+              }
+            },
+            margin:{left:mg, right:mg}, tableWidth:cW, theme:'striped'
+          });
+          y = doc.lastAutoTable.finalY + 6;
+        }
+
+        // Categorias
+        var somasCat = {};
+        dados.despesas.forEach(function(d){ somasCat[d.categoria]=(somasCat[d.categoria]||0)+d.valor; });
+        var listaCat = Object.keys(somasCat).map(function(k){return{cat:k,val:somasCat[k]};}).sort(function(a,b){return b.val-a.val;});
+        if (listaCat.length){
+          if (y > pH-50){ doc.addPage(); addRodape(doc); y = 20; }
+          y = addSecaoTitulo(doc, 'GASTOS POR CATEGORIA', y);
+          var maxCat = listaCat[0].val;
+          var despTotal2 = R.totalDespesas(dados);
+          listaCat.forEach(function(c){
+            if (y > pH-18){ doc.addPage(); addRodape(doc); y = 20; }
+            var pct = despTotal2>0 ? c.val/despTotal2*100 : 0;
+            var barW = Math.max(2, (c.val/maxCat)*100);
+            doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(40,40,40);
+            doc.text(c.cat, mg, y+4);
+            doc.setFillColor(230,235,230); doc.rect(mg+42, y, 80, 5, 'F');
+            doc.setFillColor(TEAL2[0],TEAL2[1],TEAL2[2]); doc.rect(mg+42, y, barW*0.8, 5, 'F');
+            doc.setTextColor(80,80,80);
+            doc.text(C.formatarBRL(c.val), mg+128, y+4, {align:'right'});
+            doc.text(pct.toFixed(0)+'%', mg+140, y+4, {align:'right'});
+            y += 7;
+          });
+          y += 3;
+        }
+
+        // Tabela completa de despesas
+        if (dados.despesas.length){
+          if (y > pH-50){ doc.addPage(); addRodape(doc); y = 20; }
+          y = addSecaoTitulo(doc, 'DETALHAMENTO COMPLETO DE DESPESAS', y);
+          doc.autoTable({
+            startY: y,
+            head: [['Descrição','Categoria','Vencimento','Valor','Tipo','Status']],
+            body: dados.despesas.slice().sort(function(a,b){return a.dataVenc.localeCompare(b.dataVenc);}).map(function(d){
+              return [d.descricao, d.categoria, C.formatarDataBR(d.dataVenc), C.formatarBRL(d.valor), d.essencial?'Essencial':'Não essencial', d.pago?'Pago':'Pendente'];
+            }),
+            styles:{fontSize:8, cellPadding:2.2},
+            headStyles:{fillColor:TEAL2, textColor:255, fontStyle:'bold', fontSize:8},
+            columnStyles:{3:{halign:'right'}, 5:{halign:'center'}},
+            alternateRowStyles:{fillColor:[247,249,250]},
+            didParseCell:function(data){
+              if (data.section==='body' && data.column.index===5 && data.cell.raw==='Pago'){
+                data.cell.styles.textColor = GREEN;
+              }
+            },
+            margin:{left:mg, right:mg}, tableWidth:cW, theme:'striped'
+          });
+        }
+
+        // Visão geral no final se for multi-mês e for o último
+        if (escopo==='todos' && idx===meses.length-1 && meses.length>1){
+          doc.addPage(); addRodape(doc);
+          var yv = 20;
+          doc.setFillColor(TEAL[0],TEAL[1],TEAL[2]); doc.rect(0,0,pW,16,'F');
+          doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont('helvetica','bold');
+          doc.text('CalculaBR — Visão Geral do Período', mg, 10);
+          yv = 28;
+          doc.setTextColor(TEAL[0],TEAL[1],TEAL[2]); doc.setFontSize(15); doc.setFont('helvetica','bold');
+          doc.text('Resumo — ' + meses.length + ' meses', mg, yv); yv += 10;
+          doc.autoTable({
+            startY: yv,
+            head: [['Mês','Renda','Despesas','Saldo']],
+            body: meses.map(function(m){
+              var d2 = C.dadosDoMes(m);
+              var r2 = R.totalRendas(d2), dp2 = R.totalDespesas(d2);
+              return [C.nomeMesExtenso(m), C.formatarBRL(r2), C.formatarBRL(dp2), C.formatarBRL(r2-dp2)];
+            }),
+            styles:{fontSize:9, cellPadding:3, halign:'right'},
+            headStyles:{fillColor:TEAL2, textColor:255, fontStyle:'bold'},
+            columnStyles:{0:{halign:'left'}, 3:{fontStyle:'bold'}},
+            alternateRowStyles:{fillColor:[247,249,250]},
+            margin:{left:mg, right:mg}, tableWidth:cW
+          });
+        }
       });
-    }, 300);
+
+      addRodape(doc);
+      doc.save('controle-de-gastos-' + (escopo==='todos'?'todos-os-meses':C.mesAtual) + '.pdf');
+      btnBaixar.disabled = false;
+      mostrarStatusPdf('PDF baixado com sucesso! ✓', 'var(--green)');
+
+    } catch(err){
+      console.error('Erro ao gerar PDF:', err);
+      btnBaixar.disabled = false;
+      mostrarStatusPdf('Erro ao gerar PDF: ' + err.message + '. Use "Imprimir" como alternativa.', 'var(--red)');
+    }
   });
 
   R.cancelarEdicoes = function(){
