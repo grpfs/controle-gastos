@@ -1203,7 +1203,7 @@
         doc.rect(0, 0, pW, 16, 'F');
         doc.setTextColor(255,255,255);
         doc.setFontSize(11); doc.setFont('helvetica','bold');
-        doc.text('CalculaBR — Controle de Gastos', mg, 10);
+        doc.text('CalculaBR - Controle de Gastos', mg, 10);
         doc.setFontSize(8); doc.setFont('helvetica','normal');
         doc.text('Gerado em ' + new Date().toLocaleDateString('pt-BR'), pW - mg, 10, {align:'right'});
 
@@ -1258,7 +1258,7 @@
         for (var i = 1; i <= total; i++){
           doc.setPage(i);
           doc.setFontSize(7); doc.setTextColor(170,170,170); doc.setFont('helvetica','normal');
-          doc.text('Relatório gerado por CalculaBR · uso pessoal · não substitui extratos bancários oficiais', mg, pH-5);
+          doc.text('Relatório gerado por CalculaBR - uso pessoal - nao substitui extratos bancarios oficiais', mg, pH-5);
           doc.text('Página ' + i + ' / ' + total, pW-mg, pH-5, {align:'right'});
         }
       }
@@ -1279,13 +1279,13 @@
           doc.setFillColor(253,238,236); doc.setDrawColor(243,200,195); doc.setLineWidth(0.3);
           doc.roundedRect(mg, y, cW, 9, 2, 2, 'FD');
           doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(138,39,31);
-          doc.text('⚠ Saldo negativo a partir de ' + C.formatarDataBR(primNeg.data) + '. Revise a ordem de pagamento.', mg+3, y+6);
+          doc.text('(!) Saldo negativo a partir de ' + C.formatarDataBR(primNeg.data) + '. Revise a ordem de pagamento.', mg+3, y+6);
           y += 13;
         } else if (eventos.length > 0){
           doc.setFillColor(234,246,241); doc.setDrawColor(191,224,216); doc.setLineWidth(0.3);
           doc.roundedRect(mg, y, cW, 9, 2, 2, 'FD');
           doc.setFontSize(8); doc.setFont('helvetica','normal'); doc.setTextColor(11,79,73);
-          doc.text('✓ Saldo permanece positivo durante todo o mês.', mg+3, y+6);
+          doc.text('OK  Saldo permanece positivo durante todo o mes.', mg+3, y+6);
           y += 13;
         }
 
@@ -1298,25 +1298,26 @@
 
         if (!pendentes.length){
           doc.setFontSize(9); doc.setTextColor(GREEN[0],GREEN[1],GREEN[2]); doc.setFont('helvetica','bold');
-          doc.text('✓ Tudo pago neste mês.', mg, y); y += 8;
+          doc.text('[ Tudo pago neste mes ]', mg, y); y += 8;
         } else {
           pendentes.forEach(function(d){
             if (y > pH-28){ doc.addPage(); addRodape(doc); y = 20; }
             var cor = PRIO_COR[d.prioridade];
             var bg  = PRIO_BG[d.prioridade];
             doc.setFillColor(bg[0],bg[1],bg[2]); doc.setDrawColor(cor[0],cor[1],cor[2]); doc.setLineWidth(0.3);
-            doc.roundedRect(mg, y, cW, 11, 1.5, 1.5, 'FD');
+            doc.roundedRect(mg, y, cW, 12, 1.5, 1.5, 'FD');
             doc.setFillColor(cor[0],cor[1],cor[2]);
-            doc.rect(mg, y, 2.5, 11, 'F');
+            doc.rect(mg, y, 2.5, 12, 'F');
             doc.setFontSize(8.5); doc.setFont('helvetica','bold'); doc.setTextColor(28,34,48);
-            doc.text(d.descricao.substring(0,50), mg+5, y+5);
+            doc.text(d.descricao.substring(0,50), mg+5, y+5.5);
             doc.setFontSize(7.5); doc.setFont('helvetica','normal'); doc.setTextColor(110,110,110);
-            var atrasado = d.dataVenc < C.hojeISO() ? ' ⚠ ATRASADO' : '';
-            doc.text(d.categoria + ' · Vence ' + C.formatarDataBR(d.dataVenc) + atrasado, mg+5, y+9.5);
+            var atrasado = d.dataVenc < C.hojeISO() ? ' - ATRASADO' : '';
+            doc.text(d.categoria + ' - Vence ' + C.formatarDataBR(d.dataVenc) + atrasado, mg+5, y+10);
             doc.setFontSize(9); doc.setFont('helvetica','bold'); doc.setTextColor(cor[0],cor[1],cor[2]);
-            doc.text(C.formatarBRL(d.valor), pW-mg, y+6, {align:'right'});
-            y += 13;
+            doc.text(C.formatarBRL(d.valor), pW-mg, y+6.5, {align:'right'});
+            y += 15; // box 12mm + 3mm gap
           });
+          y += 4; // espaço extra após o último item antes da próxima seção
         }
 
         // Fluxo de caixa
@@ -1325,14 +1326,14 @@
           y = addSecaoTitulo(doc, 'FLUXO DE CAIXA POR DATA', y);
           doc.autoTable({
             startY: y,
-            head: [['Data','Descrição','Tipo','Valor','Saldo Acumulado']],
+            head: [['Data','Descricao','Tipo','Valor','Saldo Acumulado']],
             body: eventos.map(function(e){
               return [
                 C.formatarDataBR(e.data),
                 e.descricao,
                 e.tipo==='entrada'?'Entrada':'Saída',
                 (e.valor>=0?'+':'')+C.formatarBRL(e.valor),
-                C.formatarBRL(e.saldoAcumulado)+(e.saldoAcumulado<0?' ⚠':'')
+                C.formatarBRL(e.saldoAcumulado)+(e.saldoAcumulado<0?' (!)':'')
               ];
             }),
             styles:{fontSize:8, cellPadding:2.2},
@@ -1340,7 +1341,7 @@
             columnStyles:{3:{halign:'right'}, 4:{halign:'right'}},
             alternateRowStyles:{fillColor:[247,249,250]},
             didParseCell:function(data){
-              if (data.section==='body' && data.row.raw[4] && data.row.raw[4].includes('⚠')){
+              if (data.section==='body' && data.row.raw[4] && data.row.raw[4].includes('(!)')){
                 data.cell.styles.textColor = RED;
                 data.cell.styles.fontStyle = 'bold';
               }
@@ -1404,10 +1405,10 @@
           var yv = 20;
           doc.setFillColor(TEAL[0],TEAL[1],TEAL[2]); doc.rect(0,0,pW,16,'F');
           doc.setTextColor(255,255,255); doc.setFontSize(11); doc.setFont('helvetica','bold');
-          doc.text('CalculaBR — Visão Geral do Período', mg, 10);
+          doc.text('CalculaBR - Visao Geral do Periodo', mg, 10);
           yv = 28;
           doc.setTextColor(TEAL[0],TEAL[1],TEAL[2]); doc.setFontSize(15); doc.setFont('helvetica','bold');
-          doc.text('Resumo — ' + meses.length + ' meses', mg, yv); yv += 10;
+          doc.text('Resumo - ' + meses.length + ' meses', mg, yv); yv += 10;
           doc.autoTable({
             startY: yv,
             head: [['Mês','Renda','Despesas','Saldo']],
